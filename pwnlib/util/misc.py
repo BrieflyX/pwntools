@@ -150,10 +150,10 @@ def run_in_new_terminal(command, terminal = None, args = None):
 
     Run a command in a new terminal.
 
-    If X11 is detected, the terminal will be launched with
-    ``x-terminal-emulator``.
-
-    If X11 is not detected, a new tmux pane is opened if possible.
+    When `terminal` is not set:
+      - If running under tmux, a new pane will be opened.
+      - If X11 is detected, a new terminal will be launched with
+        ``x-terminal-emulator``.
 
     Arguments:
       command (str): The command to run.
@@ -165,18 +165,23 @@ def run_in_new_terminal(command, terminal = None, args = None):
     """
 
     if not terminal:
-        if 'XAUTHORITY' in os.environ:
+        if 'TMUX' in os.environ:
+            terminal = 'tmux'
+            args     = ['splitw']
+        elif 'XAUTHORITY' in os.environ or \
+             os.path.isfile(os.path.expanduser('~/.Xauthority')):
             terminal = 'x-terminal-emulator'
             args     = ['-e']
 
-        elif 'TMUX' in os.environ:
-            terminal = 'tmux'
-            args     = ['splitw']
-
     if not terminal:
-        log.error('could not find terminal: %s' % terminal)
+        log.error('Not running under TMUX or X11 and `terminal` is not set')
 
-    argv    = [which(terminal)] + args + [command]
+    terminal_path = which(terminal)
+
+    if not terminal_path:
+        log.error('Could not find terminal: %s' % terminal)
+
+    argv = [terminal_path] + args + [command]
     log.debug("Launching a new terminal: %r" % argv)
 
     if os.fork() == 0:
